@@ -1391,7 +1391,7 @@ if (!verification.valid) {
 
 **Root Cause:** Redis wraps Lua script errors with "ERR " prefix, breaking naive string parsing
 
-**Fixed in:** v0.1.0+
+**Fixed in:** v0.1.1+
 
 **Solution (already implemented):**
 - Error parsing now uses regex pattern `/INSUFFICIENT_CREDITS:?\s*(\d+(?:\.\d+)?)/`
@@ -1401,7 +1401,7 @@ if (!verification.valid) {
 **Code location:** `src/client.ts:205-213`
 
 **If you still see NaN:**
-1. Ensure you're using @sparked/credits-sdk v0.1.0 or later
+1. Ensure you're using @sparked/credits-sdk v0.1.1 or later
 2. Check that built files in dist/ are up to date
 3. Rebuild your app: `pnpm build`
 
