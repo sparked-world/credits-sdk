@@ -1,5 +1,8 @@
 /**
  * Error thrown when a user has insufficient credits for an operation
+ *
+ * @property {number} required - The amount of credits required for the operation
+ * @property {number} available - The current available balance (guaranteed to be a number, defaults to 0 if parsing fails)
  */
 export class InsufficientCreditsError extends Error {
   constructor(

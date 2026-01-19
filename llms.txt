@@ -578,8 +578,8 @@ Thrown when user has insufficient credits.
 
 ```typescript
 class InsufficientCreditsError extends Error {
-  required: number;   // Credits required
-  available: number;  // Credits available
+  required: number;   // Credits required for the operation
+  available: number;  // Credits available (guaranteed to be a number, defaults to 0 if parsing fails)
 }
 ```
 
@@ -595,13 +595,15 @@ try {
       {
         error: 'Insufficient credits',
         required: error.required,
-        available: error.available,
+        available: error.available, // Always a number, never NaN
       },
       { status: 402 }
     );
   }
 }
 ```
+
+**Note:** The `available` property is extracted from Redis error messages using robust regex parsing. If extraction fails, it defaults to 0 rather than NaN.
 
 ---
 
@@ -1380,6 +1382,28 @@ if (!verification.valid) {
 1. Check Redis logs
 2. Run reconciliation
 3. Report issue with logs and reproduction steps
+
+---
+
+### InsufficientCreditsError Shows NaN Balance
+
+**Symptoms:** Error message shows `available: NaN` instead of actual balance
+
+**Root Cause:** Redis wraps Lua script errors with "ERR " prefix, breaking naive string parsing
+
+**Fixed in:** v0.1.0+
+
+**Solution (already implemented):**
+- Error parsing now uses regex pattern `/INSUFFICIENT_CREDITS:?\s*(\d+(?:\.\d+)?)/`
+- Handles multiple Redis error formats: "INSUFFICIENT_CREDITS:30", "ERR INSUFFICIENT_CREDITS:30", etc.
+- Falls back to 0 if parsing fails
+
+**Code location:** `src/client.ts:205-213`
+
+**If you still see NaN:**
+1. Ensure you're using @sparked/credits-sdk v0.1.0 or later
+2. Check that built files in dist/ are up to date
+3. Rebuild your app: `pnpm build`
 
 ---
 

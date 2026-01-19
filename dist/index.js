@@ -225,7 +225,8 @@ var CreditsSDK = class {
       };
     } catch (error) {
       if (error instanceof Error && error.message.includes("INSUFFICIENT_CREDITS")) {
-        const availableBalance = parseFloat(error.message.split(":")[1] || "0");
+        const match = error.message.match(/INSUFFICIENT_CREDITS:?\s*(\d+(?:\.\d+)?)/);
+        const availableBalance = parseFloat(match?.[1] ?? "0");
         throw new InsufficientCreditsError(amount, availableBalance);
       }
       throw new TransactionError(`Deduction failed: ${error}`, txId);

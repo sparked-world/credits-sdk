@@ -203,7 +203,13 @@ export class CreditsSDK {
       };
     } catch (error) {
       if (error instanceof Error && error.message.includes('INSUFFICIENT_CREDITS')) {
-        const availableBalance = parseFloat(error.message.split(':')[1] || '0');
+        // Extract balance using regex to handle various formats:
+        // - "INSUFFICIENT_CREDITS:30"
+        // - "ERR INSUFFICIENT_CREDITS:30"
+        // - "Command failed: ERR INSUFFICIENT_CREDITS:30"
+        // - "INSUFFICIENT_CREDITS: 30" (with space)
+        const match = error.message.match(/INSUFFICIENT_CREDITS:?\s*(\d+(?:\.\d+)?)/);
+        const availableBalance = parseFloat(match?.[1] ?? '0');
         throw new InsufficientCreditsError(amount, availableBalance);
       }
       throw new TransactionError(`Deduction failed: ${error}`, txId);

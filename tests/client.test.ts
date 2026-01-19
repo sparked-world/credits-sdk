@@ -131,6 +131,42 @@ describe.skipIf(skipIfNoRedis)('CreditsSDK', () => {
       );
     });
 
+    it('should include correct available balance in InsufficientCreditsError', async () => {
+      // User was initialized with 100 credits
+      const currentBalance = await sdk.getBalance(testUserId);
+      expect(currentBalance).toBe(100);
+
+      try {
+        // Try to deduct 200 credits (need 100 more)
+        await sdk.deduct(testUserId, 200, 'test_action');
+        expect.fail('Should have thrown InsufficientCreditsError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(InsufficientCreditsError);
+        if (error instanceof InsufficientCreditsError) {
+          expect(error.required).toBe(200);
+          expect(error.available).toBe(100); // NOT NaN!
+          expect(error.message).toContain('required 200');
+          expect(error.message).toContain('available 100');
+        }
+      }
+    });
+
+    it('should handle edge case where user has 0 credits', async () => {
+      const zeroUserId = `${testUserId}-zero`;
+      await sdk.initializeUser(zeroUserId, 0);
+
+      try {
+        await sdk.deduct(zeroUserId, 50, 'test_action');
+        expect.fail('Should have thrown InsufficientCreditsError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(InsufficientCreditsError);
+        if (error instanceof InsufficientCreditsError) {
+          expect(error.available).toBe(0); // NOT NaN!
+          expect(error.required).toBe(50);
+        }
+      }
+    });
+
     it('should throw error for negative deduction amount', async () => {
       await expect(sdk.deduct(testUserId, -10, 'test_action')).rejects.toThrow(TransactionError);
     });
