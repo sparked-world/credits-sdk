@@ -150,12 +150,37 @@ const balance = await credits.getBalance('user_123');
 
 ##### `getTransactions(userId, options?)`
 
-Get transaction history for a user.
+Retrieve transaction history for a user.
 
+**Parameters:**
+- `userId` (string): User ID
+- `options` (object, optional):
+  - `limit` (number): Max transactions to return (default: 50, max: 1000)
+  - `startTime` (number): Unix timestamp in ms - filter transactions after this time
+  - `endTime` (number): Unix timestamp in ms - filter transactions before this time
+
+**Behavior:**
+- **No time range** (default): Returns latest N transactions by index (most efficient)
+- **With time range**: Filters transactions within the specified time window
+
+**Performance Notes:**
+- Index queries (no time filter): O(log N + M) where M = limit
+- Score queries (with time filter): O(log N + K) where K = transactions in range, then sliced to limit
+- For large time ranges, use narrow windows or increase limit cautiously
+
+**Examples:**
 ```typescript
-const transactions = await credits.getTransactions('user_123', {
-  limit: 50,
-  startTime: Date.now() - 86400000, // Last 24 hours
+// Get latest 50 transactions (default)
+const recent = await credits.getTransactions('user_123');
+
+// Get last 100 transactions
+const last100 = await credits.getTransactions('user_123', { limit: 100 });
+
+// Get transactions from last hour
+const hourAgo = Date.now() - 60 * 60 * 1000;
+const recentHour = await credits.getTransactions('user_123', {
+  startTime: hourAgo,
+  endTime: Date.now()
 });
 // Returns: Transaction[]
 ```

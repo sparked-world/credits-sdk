@@ -1,6 +1,6 @@
 {
   "name": "@sparked/credits-sdk",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Shared credits system for Sparked applications with Redis-backed event sourcing",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
@@ -45,6 +45,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.3.11",
     "@types/node": "^20.10.6",
+    "dotenv": "^17.2.3",
     "tsup": "^8.0.1",
     "typescript": "^5.9.3",
     "vitest": "^1.1.0"

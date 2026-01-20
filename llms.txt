@@ -6,7 +6,7 @@
 
 ## OVERVIEW
 
-**Package**: @sparked/credits-sdk v1.0.0
+**Package**: @sparked/credits-sdk v0.1.2
 **Purpose**: Shared credit balances across 4 Next.js apps (app, canvas, studio, train)
 **Architecture**: Redis-backed event sourcing with Lua script atomicity
 **Use Case**: Prevent race conditions when multiple apps access same user's balance simultaneously

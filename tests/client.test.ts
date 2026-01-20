@@ -12,9 +12,12 @@ const skipIfNoRedis = !REDIS_URL || !REDIS_TOKEN;
 
 describe.skipIf(skipIfNoRedis)('CreditsSDK', () => {
   let sdk: CreditsSDK;
-  const testUserId = `test-user-${Date.now()}`;
+  let testUserId: string;
 
   beforeEach(() => {
+    // Generate unique user ID for each test to prevent data pollution
+    testUserId = `test-user-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
     sdk = new CreditsSDK({
       url: REDIS_URL,
       token: REDIS_TOKEN,
@@ -237,6 +240,7 @@ describe.skipIf(skipIfNoRedis)('CreditsSDK', () => {
       const transactions = await sdk.getTransactions(testUserId);
 
       expect(transactions.length).toBeGreaterThanOrEqual(3);
+      expect(transactions.length).toBeGreaterThan(0); // Ensure not empty
       // Transactions should be sorted newest first
       expect(transactions[0]?.action).toBe('action3');
     });
@@ -249,6 +253,52 @@ describe.skipIf(skipIfNoRedis)('CreditsSDK', () => {
       const transactions = await sdk.getTransactions(testUserId, { limit: 2 });
 
       expect(transactions.length).toBeLessThanOrEqual(2);
+    });
+
+    it('should retrieve latest transactions without time filter', async () => {
+      // Create 10 transactions over 1 second
+      for (let i = 0; i < 10; i++) {
+        await sdk.deduct(testUserId, 1, `action${i}`);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      const txs = await sdk.getTransactions(testUserId);
+
+      expect(txs.length).toBeGreaterThan(0); // Should NOT be empty!
+      expect(txs[0]?.action).toBe('action9'); // Newest first
+    });
+
+    it('should filter transactions by time range', async () => {
+      await sdk.initializeUser(testUserId, 100);
+      await sdk.deduct(testUserId, 10, 'before');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      const rangeStart = Date.now();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await sdk.deduct(testUserId, 20, 'during');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const rangeEnd = Date.now();
+
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      await sdk.deduct(testUserId, 30, 'after');
+
+      const txs = await sdk.getTransactions(testUserId, {
+        startTime: rangeStart,
+        endTime: rangeEnd,
+      });
+
+      expect(txs.length).toBe(1);
+      expect(txs[0]?.action).toBe('during');
+    });
+
+    it('should respect limit parameter without time range', async () => {
+      for (let i = 0; i < 20; i++) {
+        await sdk.deduct(testUserId, 1, `action${i}`);
+      }
+
+      const txs = await sdk.getTransactions(testUserId, { limit: 5 });
+
+      expect(txs.length).toBe(5);
     });
   });
 

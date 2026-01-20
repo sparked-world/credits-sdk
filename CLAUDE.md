@@ -184,6 +184,12 @@ The package uses modern `exports` in `package.json`:
 - Redis connection failures (infra concern, not SDK logic)
 - Network timeouts (covered by Upstash SDK)
 
+### Testing getTransactions()
+- **Always test without options first** - this is the most common use case
+- Test time-range queries separately with explicit startTime/endTime
+- Verify that transactions are returned in reverse chronological order
+- Test limit parameter works correctly for both index and score-based queries
+
 ### Running Individual Tests
 ```bash
 # Run specific test file

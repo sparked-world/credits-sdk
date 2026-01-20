@@ -330,20 +330,54 @@ export class CreditsSDK {
     const txsKey = this.getTransactionsKey(userId);
     const { limit = 50, startTime, endTime } = options;
 
-    // Query transactions by timestamp range
-    const min = startTime ?? 0;
-    const max = endTime ?? Date.now();
+    // Validate limit parameter
+    if (limit <= 0 || !Number.isInteger(limit)) {
+      throw new TransactionError('limit must be a positive integer');
+    }
 
-    const results = await this.redis.zrange<string[]>(txsKey, min, max, {
-      byScore: true,
-      rev: true, // Newest first
-      offset: 0,
-      count: limit,
-    });
+    // Hard cap to prevent memory issues (can be increased with pagination in future)
+    const MAX_RESULTS = 1000;
+    const effectiveLimit = Math.min(limit, MAX_RESULTS);
 
-    return results.map((txStr) => {
+    let results: (string | Transaction)[];
+
+    // Case 1: No time range - use index-based query (fastest, most common)
+    if (startTime === undefined && endTime === undefined) {
+      results = await this.redis.zrange<(string | Transaction)[]>(txsKey, 0, effectiveLimit - 1, {
+        rev: true, // Newest first
+      });
+    }
+    // Case 2: Time range specified - use score-based query
+    else {
+      const min = startTime ?? 0;
+      const max = endTime ?? Date.now();
+
+      // Fetch all results in time range
+      // Use zrangebyscore and reverse to get newest first
+      const allResults = await this.redis.zrange<(string | Transaction)[]>(txsKey, max, min, {
+        byScore: true,
+        rev: true,
+      });
+
+      // Warn if results exceed limit (indicates pagination might be needed)
+      if (allResults.length > effectiveLimit) {
+        console.warn(
+          `[CreditsSDK] Transaction query for user ${userId} returned ${allResults.length} results, ` +
+            `limiting to ${effectiveLimit}. Consider using narrower time ranges or pagination.`
+        );
+      }
+
+      results = allResults.slice(0, effectiveLimit);
+    }
+
+    return results.map((txData) => {
       try {
-        return JSON.parse(txStr) as Transaction;
+        // Handle both auto-deserialized objects and JSON strings from Upstash Redis
+        if (typeof txData === 'string') {
+          return JSON.parse(txData) as Transaction;
+        }
+        // Already deserialized by Upstash SDK
+        return txData;
       } catch (error) {
         throw new TransactionError(`Failed to parse transaction data: ${error}`);
       }
@@ -419,12 +453,13 @@ export class CreditsSDK {
     const txsKey = this.getTransactionsKey(userId);
 
     // Get all transactions
-    const results = await this.redis.zrange<string[]>(txsKey, 0, -1);
+    const results = await this.redis.zrange<(string | Transaction)[]>(txsKey, 0, -1);
 
     // Sum all transaction amounts
-    return results.reduce((sum, txStr) => {
+    return results.reduce((sum, txData) => {
       try {
-        const tx = JSON.parse(txStr) as Transaction;
+        // Handle both auto-deserialized objects and JSON strings from Upstash Redis
+        const tx = typeof txData === 'string' ? (JSON.parse(txData) as Transaction) : txData;
         return sum + tx.amount;
       } catch (error) {
         throw new BalanceVerificationError(

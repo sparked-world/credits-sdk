@@ -291,18 +291,37 @@ var CreditsSDK = class {
     this.validateUserId(userId);
     const txsKey = this.getTransactionsKey(userId);
     const { limit = 50, startTime, endTime } = options;
-    const min = startTime ?? 0;
-    const max = endTime ?? Date.now();
-    const results = await this.redis.zrange(txsKey, min, max, {
-      byScore: true,
-      rev: true,
-      // Newest first
-      offset: 0,
-      count: limit
-    });
-    return results.map((txStr) => {
+    if (limit <= 0 || !Number.isInteger(limit)) {
+      throw new TransactionError("limit must be a positive integer");
+    }
+    const MAX_RESULTS = 1e3;
+    const effectiveLimit = Math.min(limit, MAX_RESULTS);
+    let results;
+    if (startTime === void 0 && endTime === void 0) {
+      results = await this.redis.zrange(txsKey, 0, effectiveLimit - 1, {
+        rev: true
+        // Newest first
+      });
+    } else {
+      const min = startTime ?? 0;
+      const max = endTime ?? Date.now();
+      const allResults = await this.redis.zrange(txsKey, max, min, {
+        byScore: true,
+        rev: true
+      });
+      if (allResults.length > effectiveLimit) {
+        console.warn(
+          `[CreditsSDK] Transaction query for user ${userId} returned ${allResults.length} results, limiting to ${effectiveLimit}. Consider using narrower time ranges or pagination.`
+        );
+      }
+      results = allResults.slice(0, effectiveLimit);
+    }
+    return results.map((txData) => {
       try {
-        return JSON.parse(txStr);
+        if (typeof txData === "string") {
+          return JSON.parse(txData);
+        }
+        return txData;
       } catch (error) {
         throw new TransactionError(`Failed to parse transaction data: ${error}`);
       }
@@ -363,9 +382,9 @@ var CreditsSDK = class {
   async calculateBalanceFromTransactions(userId) {
     const txsKey = this.getTransactionsKey(userId);
     const results = await this.redis.zrange(txsKey, 0, -1);
-    return results.reduce((sum, txStr) => {
+    return results.reduce((sum, txData) => {
       try {
-        const tx = JSON.parse(txStr);
+        const tx = typeof txData === "string" ? JSON.parse(txData) : txData;
         return sum + tx.amount;
       } catch (error) {
         throw new BalanceVerificationError(
