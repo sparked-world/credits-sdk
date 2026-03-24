@@ -17,9 +17,11 @@
       "require": "./dist/index.js"
     }
   },
+  "packageManager": "pnpm@10.29.3",
   "scripts": {
+    "setup": "pnpm install && pnpm build",
+    "start:dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "build": "tsup src/index.ts --format cjs,esm --dts --clean",
-    "dev": "tsup src/index.ts --format cjs,esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest",
     "test:watch": "vitest --watch",
